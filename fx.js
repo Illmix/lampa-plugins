@@ -599,12 +599,24 @@
           Lampa.Utils.imgLoad(image, elem.img);
         }
         item.on('hover:enter', function() {
+          _this3.activity.loader(true);
+
           _this3.reset();
-          _this3.request(elem.url);
+
+          object.search_date = year;
+          selected_id = elem.id;
+
+          _this3.extendChoice();
+
+          if (source.search) {
+            source.search(object, [elem]);
+          } else {
+            _this3.doesNotAnswer();
+          }
         }).on('hover:focus', function(e) {
           last = e.target;
           scroll.update($(e.target), true);
-        })
+        });
         scroll.append(item);
       });
     };
