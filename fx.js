@@ -728,13 +728,15 @@
     };
     this.getEpisodes = function(season, call) {
       var episodes = [];
-      // Берем ID: если источник не TMDB, ищем tmdb_id внутри объекта
+      // ЛОГИКА ИЗ VOD: Правильное определение ID
       var tmdb_id = object.movie.id;
+      // Если источник не cub и не tmdb, пытаемся взять tmdb_id из свойств
       if (['cub', 'tmdb'].indexOf(object.movie.source || 'tmdb') == -1) {
-        tmdb_id = object.movie.tmdb_id || tmdb_id;
+        tmdb_id = object.movie.tmdb_id;
       }
 
-      if (typeof tmdb_id == 'number' && object.movie.name) {
+      // Проверка наличия ID и выполнение запроса
+      if (tmdb_id && object.movie.name) {
         var tmdburl = 'tv/' + tmdb_id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
         var baseurl = Lampa.TMDB.api(tmdburl);
         network.timeout(1000 * 10);
@@ -753,6 +755,9 @@
 
       if (!items.length) return this.empty();
 
+      // Очищаем скролл перед отрисовкой, как в vod (кроме блока 'watched', его в fx нет)
+      // scroll.clear(); // В fx.js обычно используется reset перед draw, но можно оставить как есть
+
       this.getEpisodes(items[0].season, function(episodes) {
         var viewed = Lampa.Storage.cache('online_view', 5000, []);
         var serial = object.movie.name ? true : false;
@@ -762,20 +767,25 @@
         var scroll_to_mark = false;
 
         items.forEach(function(element, index) {
-          // Ищем эпизод в ответе TMDB
+          // Поиск эпизода в полученных данных TMDB
           var episode = serial && episodes.length && !params.similars ? episodes.find(function(e) {
             return e.episode_number == element.episode;
           }) : false;
 
           var episode_num = element.episode || index + 1;
           var episode_last = choice.episodes_view[element.season];
-          // Определяем название озвучки
+          // Определение названия озвучки или серии
           var voice_name = element.voice_name || (serial ? 'Неизвестно' : element.title) || 'Неизвестно';
 
-          // Обновляем данные элемента
+          // Если есть данные о качестве, берем первое доступное (логика vod)
+          if (element.quality && typeof element.quality == 'object') {
+            element.qualitys = element.quality;
+            element.quality = Lampa.Arrays.getKeys(element.quality)[0];
+          }
+
           Lampa.Arrays.extend(element, {
             voice_name: voice_name,
-            info: voice_name, // По умолчанию в инфо - озвучка
+            info: voice_name.length > 60 ? voice_name.substr(0, 60) + '...' : voice_name,
             quality: element.quality || '',
             time: Lampa.Utils.secondsToTime((episode ? episode.runtime : object.movie.runtime) * 60, true)
           });
@@ -794,12 +804,14 @@
             element.translate_voice = element.voice_name;
           }
 
+          // Если в элементе есть текст и нет эпизода TMDB, используем текст как заголовок
+          if (element.text && !episode) element.title = element.text;
+
           element.timeline = Lampa.Timeline.view(hash_timeline);
 
-          // Если эпизод найден в TMDB, берем красивые данные
+          // ЛОГИКА ОТОБРАЖЕНИЯ ИНФОРМАЦИИ ИЗ VOD
           if (episode) {
-            element.title = episode.name; // Название серии вместо "Серия X"
-
+            element.title = episode.name; // Реальное название серии
             // Рейтинг
             if (element.info.length < 30 && episode.vote_average) {
               info.push(Lampa.Template.get('online_prestige_rate', {
@@ -807,17 +819,13 @@
               }, true));
             }
             // Дата выхода
-            if (episode.air_date && fully) {
-              info.push(Lampa.Utils.parseTime(episode.air_date).full);
-            }
+            if (episode.air_date && fully) info.push(Lampa.Utils.parseTime(episode.air_date).full);
           } else if (object.movie.release_date && fully) {
             info.push(Lampa.Utils.parseTime(object.movie.release_date).full);
           }
 
           if (!serial && object.movie.tagline && element.info.length < 30) info.push(object.movie.tagline);
-
-          // Если есть дополнительная инфо (из items), добавляем её
-          if (element.info && typeof element.info === 'string' && info.indexOf(element.info) === -1) info.push(element.info);
+          if (element.info) info.push(element.info);
 
           if (info.length) element.info = info.map(function(i) {
             return '<span>' + i + '</span>';
@@ -849,7 +857,7 @@
               if (serial) image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
             };
 
-            // Приоритет картинки эпизода
+            // ЛОГИКА КАРТИНОК ИЗ VOD: Still Path (кадр из серии)
             img.src = Lampa.TMDB.image('t/p/w300' + (episode ? episode.still_path : object.movie.backdrop_path));
             images.push(img);
           }
@@ -883,11 +891,15 @@
 
             _this5.saveChoice(choice);
 
+            // Логика сохранения истории просмотра
+            var voice_name_text = choice.voice_name || element.voice_name || element.title;
+            if (voice_name_text.length > 30) voice_name_text = voice_name_text.slice(0, 30) + '...';
+
             _this5.watched({
-              balanser: balanser,
-              balanser_name: Lampa.Utils.capitalizeFirstLetter(balanser),
+              balanser: 'fxapi', // Принудительно ставим fxapi, т.к. мы внутри него
+              balanser_name: 'Filmix',
               voice_id: choice.voice_id,
-              voice_name: choice.voice_name || element.voice_name,
+              voice_name: voice_name_text,
               episode: element.episode,
               season: element.season
             });
@@ -895,7 +907,6 @@
 
           element.unmark = function() {
             viewed = Lampa.Storage.cache('online_view', 5000, []);
-
             if (viewed.indexOf(hash_behold) !== -1) {
               Lampa.Arrays.remove(viewed, hash_behold);
               Lampa.Storage.set('online_view', viewed);
@@ -942,7 +953,7 @@
           scroll.append(html);
         });
 
-        // Блок "оставшиеся серии" (как в vod), если эпизодов в базе больше, чем в наличии
+        // Блок "Оставшиеся серии" (Future Episodes), как в vod
         if (serial && episodes.length > items.length && !params.similars) {
           var left = episodes.slice(items.length);
           left.forEach(function(episode) {
@@ -991,7 +1002,7 @@
               last = e.target;
               scroll.update($(e.target), true);
             });
-            html.css('opacity', '0.5'); // Делаем их полупрозрачными
+            html.css('opacity', '0.5');
             scroll.append(html);
           });
         }
