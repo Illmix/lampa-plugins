@@ -572,50 +572,39 @@
 
     this.similars = function(json) {
       var _this3 = this;
-
+      scroll.clear();
       json.forEach(function(elem) {
+        elem.title = elem.text;
+        elem.info = '';
         var info = [];
-        var year = ((elem.start_date || elem.year || '') + '').slice(0, 4);
-        if (elem.rating && elem.rating !== 'null' && elem.filmId) info.push(Lampa.Template.get('lampac_prestige_rate', {
-          rate: elem.rating
-        }, true));
+        var year = ((elem.start_date || elem.year || object.movie.release_date || object.movie.first_air_date || '') + '').slice(0, 4);
         if (year) info.push(year);
-
-        if (elem.countries && elem.countries.length) {
-          info.push((elem.filmId ? elem.countries.map(function(c) {
-            return c.country;
-          }) : elem.countries).join(', '));
-        }
-
-        if (elem.categories && elem.categories.length) {
-          info.push(elem.categories.slice(0, 4).join(', '));
-        }
-
-        var name = elem.title || elem.ru_title || elem.en_title || elem.nameRu || elem.nameEn;
-        var orig = elem.orig_title || elem.nameEn || '';
-        elem.title = name + (orig && orig !== name ? ' / ' + orig : '');
-        elem.time = elem.filmLength || '';
+        if (elem.details) info.push(elem.details);
+        var name = elem.title || elem.text;
+        elem.title = name;
+        elem.time = elem.time || '';
         elem.info = info.join('<span class="online-prestige-split">●</span>');
         var item = Lampa.Template.get('lampac_prestige_folder', elem);
-        item.on('hover:enter', function() {
-          _this3.activity.loader(true);
+        if (elem.img) {
+          var image = $('<img style="height: 7em; width: 7em; border-radius: 0.3em;"/>');
+          item.find('.online-prestige__folder').empty().append(image);
 
-          _this3.reset();
-
-          object.search_date = year;
-          selected_id = elem.id;
-
-          _this3.extendChoice();
-
-          if (source.search) {
-            source.search(object, [elem]);
-          } else {
-            _this3.doesNotAnswer();
+          if (elem.img !== undefined) {
+            if (elem.img.charAt(0) === '/')
+              elem.img = Defined.localhost + elem.img.substring(1);
+            if (elem.img.indexOf('/proxyimg') !== -1)
+              elem.img = account(elem.img);
           }
+
+          Lampa.Utils.imgLoad(image, elem.img);
+        }
+        item.on('hover:enter', function() {
+          _this3.reset();
+          _this3.request(elem.url);
         }).on('hover:focus', function(e) {
           last = e.target;
           scroll.update($(e.target), true);
-        });
+        })
         scroll.append(item);
       });
     };
@@ -692,6 +681,14 @@
       if (filter_items.voice && filter_items.voice.length) add('voice', Lampa.Lang.translate('torrent_parser_voice'));
       if (filter_items.season && filter_items.season.length) add('season', Lampa.Lang.translate('torrent_serial_season'));
       filter.set('filter', select);
+      filter.set('sort', filter_sources.map(function(e) {
+        return {
+          title: sources[e].name,
+          source: e,
+          selected: e == balanser,
+          ghost: !sources[e].show
+        };
+      }));
       this.selected(filter_items);
     };
     /**
@@ -817,7 +814,7 @@
             element.translate_episode_end = _this5.getLastEpisode(items);
             element.translate_voice = element.voice_name;
           }
-
+          if (element.text && !episode) element.title = element.text;
           element.timeline = Lampa.Timeline.view(hash_timeline);
 
           if (episode) {
@@ -893,12 +890,13 @@
             }
 
             _this5.saveChoice(choice);
-
+            var voice_name_text = choice.voice_name || element.voice_name || element.title;
+            if (voice_name_text.length > 30) voice_name_text = voice_name_text.slice(0, 30) + '...';
             _this5.watched({
               balanser: balanser,
               balanser_name: Lampa.Utils.capitalizeFirstLetter(balanser),
               voice_id: choice.voice_id,
-              voice_name: choice.voice_name || element.voice_name,
+              voice_name: voice_name_text,
               episode: element.episode,
               season: element.season
             });
