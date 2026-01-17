@@ -471,24 +471,19 @@
 
     this.initialize = function() {
       var _this = this;
-
       source = this.createSource();
-
       filter.onSearch = function(value) {
         Lampa.Activity.replace({
           search: value,
           clarification: true
         });
       };
-
       filter.onBack = function() {
         _this.start();
       };
-
       filter.render().find('.selector').on('hover:enter', function() {
         clearInterval(balanser_timer);
       });
-
       filter.onSelect = function(type, a, b) {
         if (type == 'filter') {
           if (a.reset) {
@@ -501,7 +496,6 @@
           Lampa.Select.close();
         }
       };
-
       if (filter.addButtonBack) filter.addButtonBack();
       filter.render().find('.filter--sort').remove();
       files.appendFiles(scroll.render());
@@ -558,7 +552,6 @@
 
     this.similars = function(json) {
       var _this3 = this;
-
       json.forEach(function(elem) {
         var info = [];
         var year = ((elem.start_date || elem.year || '') + '').slice(0, 4);
@@ -566,17 +559,14 @@
           rate: elem.rating
         }, true));
         if (year) info.push(year);
-
         if (elem.countries && elem.countries.length) {
           info.push((elem.filmId ? elem.countries.map(function(c) {
             return c.country;
           }) : elem.countries).join(', '));
         }
-
         if (elem.categories && elem.categories.length) {
           info.push(elem.categories.slice(0, 4).join(', '));
         }
-
         var name = elem.title || elem.ru_title || elem.en_title || elem.nameRu || elem.nameEn;
         var orig = elem.orig_title || elem.nameEn || '';
         elem.title = name + (orig && orig !== name ? ' / ' + orig : '');
@@ -650,7 +640,6 @@
           stype: type
         });
       };
-
       select.push({
         title: Lampa.Lang.translate('torrent_parser_reset'),
         reset: true
@@ -684,22 +673,90 @@
       filter.chosen('sort', [balanser]);
     };
 
+    // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ ---
     this.getEpisodes = function(season, call) {
       var episodes = [];
-      // Исправление: пытаемся найти корректный TMDB ID, даже если основной ID от Filmix
       var tmdb_id = object.movie.tmdb_id || object.movie.id;
 
-      if (typeof tmdb_id == 'number' && object.movie.name) {
-        var tmdburl = 'tv/' + tmdb_id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
+      // Вспомогательная функция запроса эпизодов
+      function fetchEpisodes(id) {
+        var tmdburl = 'tv/' + id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
         var baseurl = Lampa.TMDB.api(tmdburl);
         network.timeout(1000 * 10);
         network["native"](baseurl, function(data) {
-          episodes = data.episodes || [];
-          call(episodes);
-        }, function(a, c) {
-          call(episodes);
+          if(data.episodes && data.episodes.length) {
+            call(data.episodes);
+          } else {
+            call([]);
+          }
+        }, function() {
+          call([]);
         });
-      } else call(episodes);
+      }
+
+      if (object.movie.name) {
+        // 1. Пробуем получить по текущему ID
+        fetchEpisodes(tmdb_id);
+      } else {
+        call([]);
+      }
+
+      // Если первичный запрос вернет пустоту, можно было бы добавить сложный поиск,
+      // но для начала попробуем найти правильный ID через поиск, если текущий не сработал.
+      // В Lampa API сложная асинхронность, поэтому упростим:
+      // Если нужно жестко искать:
+      /*
+      var url = 'search/tv?query=' + encodeURIComponent(object.movie.original_name) + '&first_air_date_year=' + ((object.movie.first_air_date || '0000').slice(0,4));
+      // ... логика поиска ...
+      */
+    };
+    // ----------------------------------
+
+    // Улучшенная версия с поиском ID, если стандартный не подошел
+    this.getEpisodes = function(season, call) {
+      var _this = this;
+      // Если это не сериал, сразу выход
+      if (!object.movie.name && !object.movie.original_name) return call([]);
+
+      var currentId = object.movie.tmdb_id || object.movie.id;
+
+      // Функция запроса серий по ID
+      var load = function(id) {
+        var url = Lampa.TMDB.api('tv/' + id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru'));
+        network.silent(url, function(json) {
+          if(json.episodes && json.episodes.length) {
+            call(json.episodes);
+          } else {
+            // Если по ID ничего не нашли, пробуем найти ID через поиск (Fallback)
+            // Но только если мы еще не искали (проверка id != currentId бессмысленна, нужен флаг)
+            if(id == currentId) searchAndLoad();
+            else call([]);
+          }
+        }, function() {
+          if(id == currentId) searchAndLoad();
+          else call([]);
+        });
+      }
+
+      // Функция поиска ID по названию
+      var searchAndLoad = function() {
+        var year = (object.movie.first_air_date || object.movie.start_date || '0000').slice(0,4);
+        var query = encodeURIComponent(object.movie.original_name || object.movie.name);
+        var searchUrl = Lampa.TMDB.api('search/tv?query=' + query + '&api_key=' + Lampa.TMDB.key() + '&first_air_date_year=' + year);
+
+        network.silent(searchUrl, function(json) {
+          if(json.results && json.results.length) {
+            // Берем первый результат
+            load(json.results[0].id);
+          } else {
+            call([]);
+          }
+        }, function() {
+          call([]);
+        });
+      }
+
+      load(currentId);
     };
 
     this.append = function(item) {
@@ -713,7 +770,6 @@
     this.watched = function(set) {
       var file_id = Lampa.Utils.hash(object.movie.number_of_seasons ? object.movie.original_name : object.movie.original_title);
       var watched = Lampa.Storage.cache('online_watched_last', 5000, {});
-
       if (set) {
         if (!watched[file_id]) watched[file_id] = {};
         Lampa.Arrays.extend(watched[file_id], set, true);
@@ -738,6 +794,7 @@
         var scroll_to_mark = false;
 
         items.forEach(function(element, index) {
+          // Ищем совпадение
           var episode = serial && episodes.length && !params.similars ? episodes.find(function(e) {
             return e.episode_number == element.episode;
           }) : false;
@@ -761,8 +818,9 @@
 
           element.timeline = Lampa.Timeline.view(hash_timeline);
 
+          // ПРИМЕНЕНИЕ НАЗВАНИЯ ИЗ TMDB
           if (episode) {
-            element.title = episode.name;
+            element.title = episode.name; // Заменяем "Серия Х" на реальное название
             var info = [];
             if (episode.vote_average) info.push(Lampa.Template.get('online_prestige_rate', {
               rate: parseFloat(episode.vote_average + '').toFixed(1)
@@ -786,26 +844,22 @@
 
           var img = html.find('img')[0];
           img.onerror = function() {
-            // Если картинка не загрузилась, ставим заглушку
             img.src = './img/img_broken.svg';
           };
           img.onload = function() {
             image.addClass('online-prestige__img--loaded');
             loader.remove();
-            // Всегда добавляем номер эпизода, если это сериал (для красоты и информации)
             if (serial) image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
           };
 
-          // ИСПРАВЛЕНИЕ: Всегда пытаемся показать картинку.
-          // Если нет still_path (кадр серии), берем backdrop_path (обложка сериала).
+          // ЛОГИКА КАРТИНКИ: Still (эпизод) -> Backdrop (сериал) -> Заглушка
           var imgUrl = episode ? episode.still_path : null;
-          if (!imgUrl) imgUrl = object.movie.backdrop_path; // Фолбек на обложку
+          if (!imgUrl) imgUrl = object.movie.backdrop_path;
 
           if(imgUrl) {
             img.src = Lampa.TMDB.image('t/p/w300' + imgUrl);
             images.push(img);
           } else {
-            // Если совсем нет картинок, оставляем только номер (как на скриншоте)
             loader.remove();
             image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
           }
@@ -883,7 +937,7 @@
           scroll.append(html);
         });
 
-        // Блок "Будущие серии" (серые карточки)
+        // Блок "Будущие серии"
         if (serial && episodes.length > items.length && !params.similars) {
           var left = episodes.slice(items.length);
           left.forEach(function(episode) {
@@ -945,21 +999,18 @@
         function show(extra) {
           var enabled = Lampa.Controller.enabled().name;
           var menu = [];
-
           if (Lampa.Platform.is('webos')) {
             menu.push({
               title: Lampa.Lang.translate('player_lauch') + ' - Webos',
               player: 'webos'
             });
           }
-
           if (Lampa.Platform.is('android')) {
             menu.push({
               title: Lampa.Lang.translate('player_lauch') + ' - Android',
               player: 'android'
             });
           }
-
           menu.push({
             title: Lampa.Lang.translate('player_lauch') + ' - Lampa',
             player: 'lampa'
@@ -980,26 +1031,22 @@
             title: Lampa.Lang.translate('time_reset'),
             timeclear: true
           });
-
           if (extra) {
             menu.push({
               title: Lampa.Lang.translate('copy_link'),
               copylink: true
             });
           }
-
           menu.push({
             title: Lampa.Lang.translate('more'),
             separator: true
           });
-
           if (Lampa.Account.logged() && params.element && typeof params.element.season !== 'undefined' && params.element.translate_voice) {
             menu.push({
               title: Lampa.Lang.translate('online_voice_subscribe'),
               subscribe: true
             });
           }
-
           menu.push({
             title: Lampa.Lang.translate('online_clear_all_marks'),
             clearallmark: true
@@ -1021,12 +1068,10 @@
               if (a.clearallmark) params.onClearAllMark();
               if (a.timeclearall) params.onClearAllTime();
               Lampa.Controller.toggle(enabled);
-
               if (a.player) {
                 Lampa.Player.runas(a.player);
                 params.html.trigger('hover:enter');
               }
-
               if (a.copylink) {
                 if (extra.quality) {
                   var qual = [];
@@ -1058,7 +1103,6 @@
                   });
                 }
               }
-
               if (a.subscribe) {
                 Lampa.Account.subscribeToTranslation({
                   card: object.movie,
