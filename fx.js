@@ -742,9 +742,14 @@
 
     this.getEpisodes = function(season, call) {
       var episodes = [];
+      // Взято из vod.js: улучшенная логика получения ID
+      var tmdb_id = object.movie.id;
+      if (['cub', 'tmdb'].indexOf(object.movie.source || 'tmdb') == -1)
+        tmdb_id = object.movie.tmdb_id;
 
-      if (typeof object.movie.id == 'number' && object.movie.name) {
-        var tmdburl = 'tv/' + object.movie.id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
+      // Проверка на наличие имени (для сериалов) или заголовка
+      if (typeof tmdb_id == 'number' && (object.movie.name || object.movie.title)) {
+        var tmdburl = 'tv/' + tmdb_id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
         var baseurl = Lampa.TMDB.api(tmdburl);
         network.timeout(1000 * 10);
         network["native"](baseurl, function(data) {
