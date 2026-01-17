@@ -7,7 +7,7 @@
     unic_id = Lampa.Utils.uid(16);
     Lampa.Storage.set('fxapi_uid', unic_id);
   }
-  
+
   var proxy_url = 'http://cors.cfhttp.top/';
   var api_url = 'http://filmixapp.vip/api/v2/';
   var dev_token = 'user_dev_apk=2.0.1&user_dev_id=' + unic_id + '&user_dev_name=Lampa&user_dev_os=11&user_dev_vendor=FXAPI&user_dev_token=';
@@ -30,29 +30,29 @@
     if (!fxapi_token) {
       var user_code = '';
       var user_token = '';
-	  modalopen = true;
+      modalopen = true;
 
       var modal = $('<div><div class="broadcast__text">' + Lampa.Lang.translate('modal_text') + '</div><div class="broadcast__device selector" style="text-align: center; background-color: darkslategrey; color: white;">' + Lampa.Lang.translate('modal_wait') + '...</div><br><div class="broadcast__scan"><div></div></div></div></div>');
-		
-		function openModal(){
-			var contrl = Lampa.Controller.enabled().name
-			Lampa.Modal.open({
-	        title: '',
-	        html: modal,
-	        onBack: function onBack() {
-	          Lampa.Modal.close();
-	          clearInterval(ping_auth);
-			  Lampa.Controller.toggle(contrl)
-	        },
-	        onSelect: function onSelect() {
-	          Lampa.Utils.copyTextToClipboard(user_code, function() {
-	            Lampa.Noty.show(Lampa.Lang.translate('copy_secuses'));
-	          }, function() {
-	            Lampa.Noty.show(Lampa.Lang.translate('copy_fail'));
-	          });
-	        }
-	      });
-		}
+
+      function openModal(){
+        var contrl = Lampa.Controller.enabled().name
+        Lampa.Modal.open({
+          title: '',
+          html: modal,
+          onBack: function onBack() {
+            Lampa.Modal.close();
+            clearInterval(ping_auth);
+            Lampa.Controller.toggle(contrl)
+          },
+          onSelect: function onSelect() {
+            Lampa.Utils.copyTextToClipboard(user_code, function() {
+              Lampa.Noty.show(Lampa.Lang.translate('copy_secuses'));
+            }, function() {
+              Lampa.Noty.show(Lampa.Lang.translate('copy_fail'));
+            });
+          }
+        });
+      }
 
       ping_auth = setInterval(function() {
         network.silent(Lampa.Utils.addUrlComponent(api_url + 'user_profile', dev_token + user_token), function(json) {
@@ -64,13 +64,13 @@
           }
         }, function(a, c) {});
       }, 2000);
-		
+
       network.quiet(Lampa.Utils.addUrlComponent(api_url + 'token_request', dev_token), function(found) {
         if (found.status == 'ok') {
           user_token = found.code;
           user_code = found.user_code;
           modal.find('.selector').text(user_code);
-		  if(!$('.modal').length) openModal()
+          if(!$('.modal').length) openModal()
         } else {
           Lampa.Noty.show(found);
         }
@@ -85,7 +85,7 @@
     this.search = function(_object, sim) {
       if (wait_similars) this.find(sim[0].id);
     };
-	
+
     function normalizeString(str) {
       return str.toLowerCase().replace(/[^a-zа-я0-9]/g, '');
     }
@@ -278,11 +278,11 @@
                   break;
                 }
               } else {
-                if (elem.id == id) {
-                  file = elem.file;
-                  break;
-                }
+              if (elem.id == id) {
+                file = elem.file;
+                break;
               }
+            }
           } else file = translat.file;
       }
 
@@ -566,7 +566,7 @@
     };
     /**
      * Есть похожие карточки
-     * @param {Object} json 
+     * @param {Object} json
      */
 
 
@@ -709,7 +709,7 @@
 
     this.selected = function(filter_items) {
       var need = this.getChoice(),
-        select = [];
+          select = [];
 
       for (var i in need) {
         if (filter_items[i] && filter_items[i].length) {
@@ -994,6 +994,7 @@
               last = e.target;
               scroll.update($(e.target), true);
             });
+            html.css('opacity', '0.5');
             scroll.append(html);
           });
         }
@@ -1249,7 +1250,7 @@
       clearInterval(balanser_timer);
       if (source && source.destroy) source.destroy();
       if (modalopen) {modalopen = false; Lampa.Modal.close();}
-	  clearInterval(ping_auth);
+      clearInterval(ping_auth);
     };
   }
 
