@@ -742,14 +742,10 @@
 
     this.getEpisodes = function(season, call) {
       var episodes = [];
-      // Взято из vod.js: улучшенная логика получения ID
-      var tmdb_id = object.movie.id;
-      if (['cub', 'tmdb'].indexOf(object.movie.source || 'tmdb') == -1)
-        tmdb_id = object.movie.tmdb_id;
-
-      // Проверка на наличие имени (для сериалов) или заголовка
-      if (typeof tmdb_id == 'number' && (object.movie.name || object.movie.title)) {
-        var tmdburl = 'tv/' + tmdb_id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
+      // Так как источник всегда TMDB, используем ID напрямую.
+      // Добавляем проверку object.movie.name ИЛИ title, чтобы работало и для карт, которые Lampa считает фильмами
+      if (object.movie.id) {
+        var tmdburl = 'tv/' + object.movie.id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
         var baseurl = Lampa.TMDB.api(tmdburl);
         network.timeout(1000 * 10);
         network["native"](baseurl, function(data) {
@@ -758,7 +754,9 @@
         }, function(a, c) {
           call(episodes);
         });
-      } else call(episodes);
+      } else {
+        call(episodes);
+      }
     };
     /**
      * Добавить элементы в список
@@ -794,27 +792,35 @@
     this.draw = function(items) {
       var _this5 = this;
       var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
       if (!items.length) return this.empty();
 
-      scroll.clear(); // Очищаем скролл перед отрисовкой, как в vod.js
+      scroll.clear();
 
       this.getEpisodes(items[0].season, function(episodes) {
         var viewed = Lampa.Storage.cache('online_view', 5000, []);
-        var serial = object.movie.name ? true : false;
+
+        // Логика vod.js: определяем, сериал это или нет.
+        // Если пришли эпизоды с TMDB, принудительно считаем это сериалом, чтобы работала подстановка картинок.
+        var serial = (object.movie.name || episodes.length > 0) ? true : false;
+
         var choice = _this5.getChoice();
         var fully = window.innerWidth > 480;
         var scroll_to_element = false;
         var scroll_to_mark = false;
 
         items.forEach(function(element, index) {
+          // Поиск эпизода в данных TMDB.
+          // params.similars check взят из vod.js.
           var episode = serial && episodes.length && !params.similars ? episodes.find(function(e) {
+            // Используем нестрогое сравнение (==), чтобы "01" (строка) было равно 1 (число)
             return e.episode_number == element.episode;
           }) : false;
+
           var episode_num = element.episode || index + 1;
           var episode_last = choice.episodes_view[element.season];
           var voice_name = choice.voice_name || element.voice_name || (serial ? 'Неизвестно' : element.text) || 'Неизвестно';
 
-          // Нормализация данных элемента
           if (element.quality && typeof element.quality === 'object') {
             element.qualitys = element.quality;
             element.quality = Lampa.Arrays.getKeys(element.quality)[0];
@@ -829,11 +835,6 @@
 
           var hash_timeline = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title].join('') : object.movie.original_title);
           var hash_behold = Lampa.Utils.hash(element.season ? [element.season, element.season > 10 ? ':' : '', element.episode, object.movie.original_title, element.voice_name].join('') : object.movie.original_title + element.voice_name);
-          var data = {
-            hash_timeline: hash_timeline,
-            hash_behold: hash_behold
-          };
-          var info = [];
 
           if (element.season) {
             element.translate_episode_end = _this5.getLastEpisode(items);
@@ -843,40 +844,47 @@
           if (element.text && !episode) element.title = element.text;
           element.timeline = Lampa.Timeline.view(hash_timeline);
 
-          // === ЛОГИКА TMDB ДАННЫХ ===
+          // === Заполнение данных из TMDB (как в vod.js) ===
+          var info = [];
           if (episode) {
-            element.title = episode.name;
-            if (element.info.length < 30 && episode.vote_average) info.push(Lampa.Template.get('online_prestige_rate', {
-              rate: parseFloat(episode.vote_average + '').toFixed(1)
-            }, true));
+            element.title = episode.name; // Подставляем название серии из TMDB
+
+            if (element.info.length < 30 && episode.vote_average) {
+              info.push(Lampa.Template.get('online_prestige_rate', {
+                rate: parseFloat(episode.vote_average + '').toFixed(1)
+              }, true));
+            }
             if (episode.air_date && fully) info.push(Lampa.Utils.parseTime(episode.air_date).full);
           } else if (object.movie.release_date && fully) {
             info.push(Lampa.Utils.parseTime(object.movie.release_date).full);
           }
-          // ==========================
 
           if (!serial && object.movie.tagline && element.info.length < 30) info.push(object.movie.tagline);
           if (element.info) info.push(element.info);
-          if (info.length) element.info = info.map(function(i) {
-            return '<span>' + i + '</span>';
-          }).join('<span class="online-prestige-split">●</span>');
+
+          if (info.length) {
+            element.info = info.map(function(i) {
+              return '<span>' + i + '</span>';
+            }).join('<span class="online-prestige-split">●</span>');
+          }
 
           var html = Lampa.Template.get('online_prestige_full', element);
           var loader = html.find('.online-prestige__loader');
           var image = html.find('.online-prestige__img');
 
-          // Скролл к последнему просмотренному
           if (!serial) {
             if (choice.movie_view == hash_behold) scroll_to_element = html;
           } else if (typeof episode_last !== 'undefined' && episode_last == episode_num) {
             scroll_to_element = html;
           }
 
-          // === ВАЖНО: Логика отрисовки картинок эпизодов (как в vod.js) ===
+          // === Логика картинок (как в vod.js) ===
           if (serial && !episode) {
+            // Если сериал, но эпизод в TMDB не найден - рисуем просто номер
             image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
             loader.remove();
           } else {
+            // Если эпизод найден или это фильм - грузим картинку
             var img = html.find('img')[0];
             img.onerror = function() {
               img.src = './img/img_broken.svg';
@@ -886,11 +894,10 @@
               loader.remove();
               if (serial) image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
             };
-            // Запрашиваем картинку эпизода или бэкдроп фильма
+            // Берем still_path (кадр эпизода) или backdrop_path (фон фильма)
             img.src = Lampa.TMDB.image('t/p/w300' + (episode ? episode.still_path : object.movie.backdrop_path));
             images.push(img);
           }
-          // ================================================================
 
           html.find('.online-prestige__timeline').append(Lampa.Timeline.render(element.timeline));
 
@@ -899,6 +906,7 @@
             html.find('.online-prestige__img').append('<div class="online-prestige__viewed">' + Lampa.Template.get('icon_viewed', {}, true) + '</div>');
           }
 
+          // Привязка событий (mark, unmark, timeclear)
           element.mark = function() {
             viewed = Lampa.Storage.cache('online_view', 5000, []);
             if (viewed.indexOf(hash_behold) == -1) {
@@ -964,21 +972,17 @@
               if (params.onContextMenu) params.onContextMenu(element, html, data, call);
             },
             onClearAllMark: function onClearAllMark() {
-              items.forEach(function(elem) {
-                elem.unmark();
-              });
+              items.forEach(function(elem) { elem.unmark(); });
             },
             onClearAllTime: function onClearAllTime() {
-              items.forEach(function(elem) {
-                elem.timeclear();
-              });
+              items.forEach(function(elem) { elem.timeclear(); });
             }
           });
 
           scroll.append(html);
         });
 
-        // Отрисовка будущих эпизодов (прозрачные)
+        // Отрисовка "будущих" (еще не вышедших) эпизодов
         if (serial && episodes.length > items.length && !params.similars) {
           var left = episodes.slice(items.length);
           left.forEach(function(episode) {
@@ -1010,9 +1014,7 @@
             var img = html.find('img')[0];
 
             if (episode.still_path) {
-              img.onerror = function() {
-                img.src = './img/img_broken.svg';
-              };
+              img.onerror = function() { img.src = './img/img_broken.svg'; };
               img.onload = function() {
                 image.addClass('online-prestige__img--loaded');
                 loader.remove();
@@ -1034,11 +1036,8 @@
           });
         }
 
-        if (scroll_to_element) {
-          last = scroll_to_element[0];
-        } else if (scroll_to_mark) {
-          last = scroll_to_mark[0];
-        }
+        if (scroll_to_element) last = scroll_to_element[0];
+        else if (scroll_to_mark) last = scroll_to_mark[0];
 
         Lampa.Controller.enable('content');
       });
