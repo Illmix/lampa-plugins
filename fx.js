@@ -515,18 +515,9 @@
       return new sources[balanser](this, object);
     };
 
-    /**
-     * Подготовка
-     */
-
-
     this.create = function() {
       return this.render();
     };
-    /**
-     * Начать поиск
-     */
-
 
     this.search = function() {
       this.activity.loader(true);
@@ -564,11 +555,6 @@
       data[selected_id || object.movie.id] = choice;
       Lampa.Storage.set('online_choice_' + (for_balanser || balanser), data);
     };
-    /**
-     * Есть похожие карточки
-     * @param {Object} json
-     */
-
 
     this.similars = function(json) {
       var _this3 = this;
@@ -599,14 +585,10 @@
         var item = Lampa.Template.get('online_prestige_folder', elem);
         item.on('hover:enter', function() {
           _this3.activity.loader(true);
-
           _this3.reset();
-
           object.search_date = year;
           selected_id = elem.id;
-
           _this3.extendChoice();
-
           if (source.search) {
             source.search(object, [elem]);
           } else {
@@ -628,10 +610,6 @@
       });
       images = [];
     };
-    /**
-     * Очистить список файлов
-     */
-
 
     this.reset = function() {
       last = false;
@@ -641,10 +619,6 @@
       scroll.render().find('.empty').remove();
       scroll.clear();
     };
-    /**
-     * Загрузка
-     */
-
 
     this.loading = function(status) {
       if (status) this.activity.loader(true);
@@ -653,19 +627,12 @@
         this.activity.toggle();
       }
     };
-    /**
-     * Построить фильтр
-     */
-
 
     this.filter = function(filter_items, choice) {
       var _this4 = this;
-
       var select = [];
-
       var add = function add(type, title) {
         var need = _this4.getChoice();
-
         var items = filter_items[type];
         var subitems = [];
         var value = need[type];
@@ -694,23 +661,14 @@
       filter.set('filter', select);
       this.selected(filter_items);
     };
-    /**
-     * Закрыть фильтр
-     */
-
 
     this.closeFilter = function() {
       if ($('body').hasClass('selectbox--open')) Lampa.Select.close();
     };
-    /**
-     * Показать что выбрано в фильтре
-     */
-
 
     this.selected = function(filter_items) {
       var need = this.getChoice(),
           select = [];
-
       for (var i in need) {
         if (filter_items[i] && filter_items[i].length) {
           if (i == 'voice') {
@@ -722,16 +680,17 @@
           }
         }
       }
-
       filter.chosen('filter', select);
       filter.chosen('sort', [balanser]);
     };
 
     this.getEpisodes = function(season, call) {
       var episodes = [];
+      // Исправление: пытаемся найти корректный TMDB ID, даже если основной ID от Filmix
+      var tmdb_id = object.movie.tmdb_id || object.movie.id;
 
-      if (typeof object.movie.id == 'number' && object.movie.name) {
-        var tmdburl = 'tv/' + object.movie.id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
+      if (typeof tmdb_id == 'number' && object.movie.name) {
+        var tmdburl = 'tv/' + tmdb_id + '/season/' + season + '?api_key=' + Lampa.TMDB.key() + '&language=' + Lampa.Storage.get('language', 'ru');
         var baseurl = Lampa.TMDB.api(tmdburl);
         network.timeout(1000 * 10);
         network["native"](baseurl, function(data) {
@@ -742,10 +701,6 @@
         });
       } else call(episodes);
     };
-    /**
-     * Добавить элементы в список
-     */
-
 
     this.append = function(item) {
       item.on('hover:focus', function(e) {
@@ -768,43 +723,36 @@
       }
     };
 
-    /**
-     * Отрисовка файлов
-     */
-
-
     this.draw = function(items) {
       var _this5 = this;
-
       var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
       if (!items.length) return this.empty();
+
       this.getEpisodes(items[0].season, function(episodes) {
         var viewed = Lampa.Storage.cache('online_view', 5000, []);
         var serial = object.movie.name ? true : false;
-
         var choice = _this5.getChoice();
-
         var fully = window.innerWidth > 480;
         var scroll_to_element = false;
         var scroll_to_mark = false;
+
         items.forEach(function(element, index) {
           var episode = serial && episodes.length && !params.similars ? episodes.find(function(e) {
             return e.episode_number == element.episode;
           }) : false;
+
           var episode_num = element.episode || index + 1;
           var episode_last = choice.episodes_view[element.season];
+
           Lampa.Arrays.extend(element, {
             info: '',
             quality: '',
             time: Lampa.Utils.secondsToTime((episode ? episode.runtime : object.movie.runtime) * 60, true)
           });
+
           var hash_timeline = Lampa.Utils.hash(element.season ? [element.season, element.episode, object.movie.original_title].join('') : object.movie.original_title);
           var hash_behold = Lampa.Utils.hash(element.season ? [element.season, element.episode, object.movie.original_title, element.voice_name].join('') : object.movie.original_title + element.voice_name);
-          var data = {
-            hash_timeline: hash_timeline,
-            hash_behold: hash_behold
-          };
-          var info = [];
 
           if (element.season) {
             element.translate_episode_end = _this5.getLastEpisode(items);
@@ -815,19 +763,17 @@
 
           if (episode) {
             element.title = episode.name;
-            if (element.info.length < 30 && episode.vote_average) info.push(Lampa.Template.get('online_prestige_rate', {
+            var info = [];
+            if (episode.vote_average) info.push(Lampa.Template.get('online_prestige_rate', {
               rate: parseFloat(episode.vote_average + '').toFixed(1)
             }, true));
             if (episode.air_date && fully) info.push(Lampa.Utils.parseTime(episode.air_date).full);
-          } else if (object.movie.release_date && fully) {
-            info.push(Lampa.Utils.parseTime(object.movie.release_date).full);
+
+            if (info.length) element.info = info.map(function(i) {
+              return '<span>' + i + '</span>';
+            }).join('<span class="online-prestige-split">●</span>');
           }
 
-          if (!serial && object.movie.tagline && element.info.length < 30) info.push(object.movie.tagline);
-          if (element.info) info.push(element.info);
-          if (info.length) element.info = info.map(function(i) {
-            return '<span>' + i + '</span>';
-          }).join('<span class="online-prestige-split">●</span>');
           var html = Lampa.Template.get('online_prestige_full', element);
           var loader = html.find('.online-prestige__loader');
           var image = html.find('.online-prestige__img');
@@ -838,24 +784,30 @@
             scroll_to_element = html;
           }
 
-          if (serial && !episode) {
-            image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
+          var img = html.find('img')[0];
+          img.onerror = function() {
+            // Если картинка не загрузилась, ставим заглушку
+            img.src = './img/img_broken.svg';
+          };
+          img.onload = function() {
+            image.addClass('online-prestige__img--loaded');
             loader.remove();
-          } else {
-            var img = html.find('img')[0];
+            // Всегда добавляем номер эпизода, если это сериал (для красоты и информации)
+            if (serial) image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
+          };
 
-            img.onerror = function() {
-              img.src = './img/img_broken.svg';
-            };
+          // ИСПРАВЛЕНИЕ: Всегда пытаемся показать картинку.
+          // Если нет still_path (кадр серии), берем backdrop_path (обложка сериала).
+          var imgUrl = episode ? episode.still_path : null;
+          if (!imgUrl) imgUrl = object.movie.backdrop_path; // Фолбек на обложку
 
-            img.onload = function() {
-              image.addClass('online-prestige__img--loaded');
-              loader.remove();
-              if (serial) image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
-            };
-
-            img.src = Lampa.TMDB.image('t/p/w300' + (episode ? episode.still_path : object.movie.backdrop_path));
+          if(imgUrl) {
+            img.src = Lampa.TMDB.image('t/p/w300' + imgUrl);
             images.push(img);
+          } else {
+            // Если совсем нет картинок, оставляем только номер (как на скриншоте)
+            loader.remove();
+            image.append('<div class="online-prestige__episode-number">' + ('0' + (element.episode || index + 1)).slice(-2) + '</div>');
           }
 
           html.find('.online-prestige__timeline').append(Lampa.Timeline.render(element.timeline));
@@ -867,26 +819,17 @@
 
           element.mark = function() {
             viewed = Lampa.Storage.cache('online_view', 5000, []);
-
             if (viewed.indexOf(hash_behold) == -1) {
               viewed.push(hash_behold);
               Lampa.Storage.set('online_view', viewed);
-
               if (html.find('.online-prestige__viewed').length == 0) {
                 html.find('.online-prestige__img').append('<div class="online-prestige__viewed">' + Lampa.Template.get('icon_viewed', {}, true) + '</div>');
               }
             }
-
             choice = _this5.getChoice();
-
-            if (!serial) {
-              choice.movie_view = hash_behold;
-            } else {
-              choice.episodes_view[element.season] = episode_num;
-            }
-
+            if (!serial) choice.movie_view = hash_behold;
+            else choice.episodes_view[element.season] = episode_num;
             _this5.saveChoice(choice);
-
             _this5.watched({
               balanser: balanser,
               balanser_name: Lampa.Utils.capitalizeFirstLetter(balanser),
@@ -899,7 +842,6 @@
 
           element.unmark = function() {
             viewed = Lampa.Storage.cache('online_view', 5000, []);
-
             if (viewed.indexOf(hash_behold) !== -1) {
               Lampa.Arrays.remove(viewed, hash_behold);
               Lampa.Storage.set('online_view', viewed);
@@ -923,7 +865,6 @@
             if (params.onFocus) params.onFocus(element, html, data);
             scroll.update($(e.target), true);
           });
-          if (params.onRender) params.onRender(element, html, data);
 
           _this5.contextMenu({
             html: html,
@@ -932,20 +873,17 @@
               if (params.onContextMenu) params.onContextMenu(element, html, data, call);
             },
             onClearAllMark: function onClearAllMark() {
-              items.forEach(function(elem) {
-                elem.unmark();
-              });
+              items.forEach(function(elem) { elem.unmark(); });
             },
             onClearAllTime: function onClearAllTime() {
-              items.forEach(function(elem) {
-                elem.timeclear();
-              });
+              items.forEach(function(elem) { elem.timeclear(); });
             }
           });
 
           scroll.append(html);
         });
 
+        // Блок "Будущие серии" (серые карточки)
         if (serial && episodes.length > items.length && !params.similars) {
           var left = episodes.slice(items.length);
           left.forEach(function(episode) {
@@ -973,16 +911,12 @@
             var img = html.find('img')[0];
 
             if (episode.still_path) {
-              img.onerror = function() {
-                img.src = './img/img_broken.svg';
-              };
-
+              img.onerror = function() { img.src = './img/img_broken.svg'; };
               img.onload = function() {
                 image.addClass('online-prestige__img--loaded');
                 loader.remove();
                 image.append('<div class="online-prestige__episode-number">' + ('0' + episode.episode_number).slice(-2) + '</div>');
               };
-
               img.src = Lampa.TMDB.image('t/p/w300' + episode.still_path);
               images.push(img);
             } else {
@@ -999,19 +933,12 @@
           });
         }
 
-        if (scroll_to_element) {
-          last = scroll_to_element[0];
-        } else if (scroll_to_mark) {
-          last = scroll_to_mark[0];
-        }
+        if (scroll_to_element) last = scroll_to_element[0];
+        else if (scroll_to_mark) last = scroll_to_mark[0];
 
         Lampa.Controller.enable('content');
       });
     };
-    /**
-     * Меню
-     */
-
 
     this.contextMenu = function(params) {
       params.html.on('hover:long', function() {
@@ -1103,14 +1030,12 @@
               if (a.copylink) {
                 if (extra.quality) {
                   var qual = [];
-
                   for (var i in extra.quality) {
                     qual.push({
                       title: i,
                       file: extra.quality[i]
                     });
                   }
-
                   Lampa.Select.show({
                     title: Lampa.Lang.translate('settings_server_links'),
                     items: qual,
@@ -1149,16 +1074,11 @@
             }
           });
         }
-
         params.onFile(show);
       }).on('hover:focus', function() {
         if (Lampa.Helper) Lampa.Helper.show('online_file', Lampa.Lang.translate('helper_online_file'), params.html);
       });
     };
-    /**
-     * Показать пустой результат
-     */
-
 
     this.empty = function(msg) {
       var html = Lampa.Template.get('online_does_not_answer', {});
@@ -1170,12 +1090,10 @@
 
     this.doesNotAnswer = function() {
       var _this6 = this;
-
       this.reset();
       var html = Lampa.Template.get('online_does_not_answer', {
         balanser: balanser
       });
-
       scroll.append(html);
       this.loading(false);
     };
@@ -1187,19 +1105,13 @@
       });
       return last_episode;
     };
-    /**
-     * Начать навигацию по файлам
-     */
-
 
     this.start = function() {
       if (Lampa.Activity.active().activity !== this.activity) return;
-
       if (!initialized) {
         initialized = true;
         this.initialize();
       }
-
       Lampa.Background.immediately(Lampa.Utils.cardImgBackgroundBlur(object.movie));
       Lampa.Controller.add('content', {
         toggle: function toggle() {
