@@ -1690,14 +1690,15 @@
           network["native"](component.proxyLink(url, prox, prox_enc, prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
-            var links = str.match(/<div class="b-content__inline_item-link">\s*<a [^>]*>[^<]*<\/a>\s*<div>[^<]*<\/div>\s*<\/div>/g);
+            var blocks = str.match(/<div class="b-content__inline_item-cover">[\s\S]*?<div class="b-content__inline_item-link">\s*<a [^>]*>[^<]*<\/a>\s*<div>[^<]*<\/div>\s*<\/div>/g);
             var have_more = !!str.match(/<a [^>]*>\s*<span class="b-navigation__next\b/);
 
-            if (links && links.length) {
-              var items = links.map(function (l) {
-                var li = $(l);
-                var link = $('a', li);
-                var info_div = $('div', li);
+            if (blocks && blocks.length) {
+              var items = blocks.map(function (l) {
+                var li = $('<div>' + l + '</div>');
+                var link = li.find('.b-content__inline_item-link a').first();
+                var info_div = li.find('.b-content__inline_item-link > div').first();
+                var cover_img = li.find('.b-content__inline_item-cover img').first();
                 var titl = link.text().trim() || '';
                 var info = info_div.text().trim() || '';
                 var orig_title = '';
@@ -1708,11 +1709,15 @@
                   year = parseInt(found[1]);
                 }
 
+                var poster = cover_img.attr('data-src') || cover_img.attr('data-original') || cover_img.attr('src') || '';
+                if (poster && poster.charAt(0) === '/') poster = host + poster;
+
                 return {
                   year: year,
                   title: titl,
                   orig_title: orig_title,
-                  link: link.attr('href') || ''
+                  link: link.attr('href') || '',
+                  img: poster
                 };
               });
               data = data.concat(items);
@@ -1842,22 +1847,11 @@
             }
 
             if (cards.length == 1 && is_sure) getPage(cards[0].link);else if (items.length) {
-              _this.wait_similars = true;
-              items.forEach(function (c) {
-                c.is_similars = true;
+              search_more({
+                items: [],
+                query: query,
+                page: 1
               });
-
-              if (have_more) {
-                component.similars(items, search_more, {
-                  items: [],
-                  query: query,
-                  page: 1
-                });
-              } else {
-                component.similars(items);
-              }
-
-              component.loading(false);
             } else component.emptyForQuery(select_title);
           } else if (error_message) component.empty(error_message);else component.emptyForQuery(select_title);
         };
