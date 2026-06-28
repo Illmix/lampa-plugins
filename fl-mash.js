@@ -13731,8 +13731,8 @@
     function initStorage() {
       if (!Utils.isDebug()) {
         Lampa.Storage.set('online_mod_proxy_lumex', 'false');
-        Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
-        Lampa.Storage.set('online_mod_proxy_kinobase', 'false');
+        Lampa.Storage.set('online_mod_proxy_rezka2', Lampa.Platform.is('android') || isLocal ? 'false' : 'true');
+        Lampa.Storage.set('online_mod_proxy_kinobase', Lampa.Platform.is('android') || isLocal ? 'false' : 'true');
         Lampa.Storage.set('online_mod_proxy_collaps', 'false');
         Lampa.Storage.set('online_mod_proxy_cdnmovies', 'false');
         Lampa.Storage.set('online_mod_proxy_fancdn', 'false');
