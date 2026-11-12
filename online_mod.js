@@ -1592,8 +1592,8 @@
       var ref = host + '/';
       // DEBUG: temporary on-screen diagnostics for HDrezka
       var dbg = function (msg) {
-        try { Lampa.Noty.show('[rezka dbg v2] ' + msg); } catch (e) {}
-        console.log('[rezka dbg v2]', msg);
+        try { Lampa.Noty.show('[rezka dbg v3] ' + msg); } catch (e) {}
+        console.log('[rezka dbg v3]', msg);
       };
       dbg('host=' + host + ' prox=' + (prox || 'none') + ' tizen=' + Lampa.Platform.is('tizen') + ' proto=' + window.location.protocol);
       var logged_in = !(prox || Lampa.Platform.is('android'));
@@ -1962,8 +1962,11 @@
         url = component.fixLink(url, ref);
         network.clear();
         network.timeout(10000);
+        dbg('page ' + url);
         network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
           extractData(str);
+          dbg('page len=' + (str || '').length + ' film_id=' + extract.film_id + ' series=' + extract.is_series + ' voices=' + extract.voice.length + ' seasons=' + extract.season.length + ' err=' + error_message + ' cdn=' + /initCDN/.test(str || ''));
+          if (!extract.film_id) dbg('page title=' + (((str || '').match(/<title>([^<]*)/) || [])[1] || '') + ' body=' + (str || '').replace(/\s+/g, ' ').substring(0, 200));
 
           if (extract.film_id) {
             getEpisodes(success);
@@ -2124,9 +2127,12 @@
               network.clear();
               network.timeout(10000);
               network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (json) {
+                dbg('episodes ' + JSON.stringify(json).substring(0, 200));
                 extractEpisodes(json, translator_id);
+                dbg('episodes parsed seasons=' + extract.season.length + ' episodes=' + extract.episode.length);
                 call();
               }, function (a, c) {
+                dbg('episodes error status=' + (a && a.status) + ' ' + c + ' body=' + ((a && a.responseText) || '').substring(0, 150));
                 component.empty(network.errorDecode(a, c));
               }, postdata, {
                 withCredentials: logged_in,
