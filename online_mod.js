@@ -1649,6 +1649,11 @@
           return;
         }
 
+        if (str.indexOf('anubis_challenge') !== -1) {
+          error_message = 'HDrezka: зеркало требует проверку на бота. Настройки → Онлайн → «Пройти проверку HDrezka (Anubis)»';
+          return;
+        }
+
         var verify_form = str.match(/<span>MIRROR<\/span>.*<button type="submit" onclick="\$\.cookie(\([^)]*\))/);
 
         if (verify_form) {
@@ -14410,6 +14415,41 @@
       });
     }
 
+    function rezka2PassAnubis(status, controller) {
+      var host = Utils.rezka2Mirror();
+      if (status) status.removeClass('active error wait').addClass('wait');
+      var html = $('<div><div class="broadcast__text">Дождитесь окончания проверки на странице ниже, затем нажмите «Назад».</div>' +
+        '<iframe src="' + host + '/" style="width:100%;height:60vh;border:0;background:#fff"></iframe></div>');
+      Lampa.Modal.open({
+        title: 'Проверка HDrezka',
+        html: html,
+        size: 'large',
+        onBack: function onBack() {
+          Lampa.Modal.close();
+          if (controller) Lampa.Controller.toggle(controller);
+          rezka2CheckAnubis(function (ok, info) {
+            Lampa.Noty.show(ok ? 'HDrezka: проверка пройдена' : 'HDrezka: проверка не сохранилась (' + info + ')');
+            if (status) status.removeClass('active error wait').addClass(ok ? 'active' : 'error');
+          });
+        }
+      });
+    }
+
+    function rezka2CheckAnubis(call) {
+      var net = new Lampa.Reguest();
+      net.timeout(15000);
+      net["native"](Utils.rezka2Mirror() + '/', function (str) {
+        str = str || '';
+        var blocked = str.indexOf('anubis_challenge') !== -1;
+        call(!blocked, blocked ? 'страница проверки' : 'ok');
+      }, function (a, c) {
+        call(false, 'status ' + (a && a.status) + ' ' + c);
+      }, false, {
+        dataType: 'text',
+        withCredentials: true
+      });
+    }
+
     function rezka2FillCookie(success, error) {
       var prox = Utils.proxy('rezka2');
       var prox_enc = '';
@@ -14816,6 +14856,7 @@
       }
 
       template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_rezka2_mirror\" data-type=\"input\" placeholder=\"#{settings_cub_not_specified}\">\n            <div class=\"settings-param__name\">#{online_mod_rezka2_mirror}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
+      template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_rezka2_anubis\" data-static=\"true\">\n            <div class=\"settings-param__name\">Пройти проверку HDrezka (Anubis)</div>\n            <div class=\"settings-param__status\"></div>\n        </div>";
 
       if (Utils.isDebug()) {
         template += "\n        <div class=\"settings-param selector\" data-name=\"online_mod_proxy_rezka2_mirror\" data-type=\"toggle\">\n            <div class=\"settings-param__name\">#{online_mod_proxy_rezka2_mirror}</div>\n            <div class=\"settings-param__value\"></div>\n        </div>";
@@ -14877,6 +14918,10 @@
             Lampa.Storage.set('online_mod_last_balanser', {});
             Lampa.Storage.set('online_mod_balanser', '');
             $('.settings-param__status', clear_last_balanser).removeClass('active error wait').addClass('active');
+          });
+          var rezka2_anubis = e.body.find('[data-name="online_mod_rezka2_anubis"]');
+          rezka2_anubis.unbind('hover:enter').on('hover:enter', function () {
+            rezka2PassAnubis($('.settings-param__status', rezka2_anubis), 'settings_component');
           });
           var rezka2_login = e.body.find('[data-name="online_mod_rezka2_login"]');
           rezka2_login.unbind('hover:enter').on('hover:enter', function () {
