@@ -1590,12 +1590,6 @@
       var prox = component.proxy('rezka2');
       var host = prox && !proxy_mirror ? 'https://rezka.ag' : Utils.rezka2Mirror();
       var ref = host + '/';
-      // DEBUG: temporary on-screen diagnostics for HDrezka
-      var dbg = function (msg) {
-        try { Lampa.Noty.show('[rezka dbg v3] ' + msg); } catch (e) {}
-        console.log('[rezka dbg v3]', msg);
-      };
-      dbg('host=' + host + ' prox=' + (prox || 'none') + ' tizen=' + Lampa.Platform.is('tizen') + ' proto=' + window.location.protocol);
       var logged_in = !(prox || Lampa.Platform.is('android'));
       var user_agent = Utils.baseUserAgent();
       var headers = Lampa.Platform.is('android') ? {
@@ -1877,10 +1871,7 @@
           var postdata = 'q=' + encodeURIComponent(query);
           network.clear();
           network.timeout(10000);
-          var dbg_url = component.proxyLink(url, prox, prox_enc, 'enc2t');
-          dbg('search ' + dbg_url + ' q=' + query);
-          network["native"](dbg_url, function (str) {
-            dbg('ok len=' + (str || '').length + ' start=' + (str || '').substring(0, 150).replace(/\s+/g, ' '));
+          network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
             str = (str || '').replace(/\n/g, '');
             checkErrorForm(str);
             var links = str.match(/<li><a href=.*?<\/li>/g);
@@ -1888,7 +1879,6 @@
             if (links && links.length) data = data.concat(links);
             if (callback) callback(data, have_more, query);
           }, function (a, c) {
-            dbg('error status=' + (a && a.status) + ' ' + c + ' body=' + ((a && a.responseText) || '').substring(0, 150).replace(/\s+/g, ' '));
             if (prox && a.status == 403 && (!a.responseText || a.responseText.indexOf('<div>105</div>') !== -1)) {
               Lampa.Storage.set('online_mod_proxy_rezka2', 'false');
             }
@@ -1967,11 +1957,8 @@
         url = component.fixLink(url, ref);
         network.clear();
         network.timeout(10000);
-        dbg('page ' + url);
         network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (str) {
           extractData(str);
-          dbg('page len=' + (str || '').length + ' film_id=' + extract.film_id + ' series=' + extract.is_series + ' voices=' + extract.voice.length + ' seasons=' + extract.season.length + ' err=' + error_message + ' cdn=' + /initCDN/.test(str || ''));
-          if (!extract.film_id) dbg('page title=' + (((str || '').match(/<title>([^<]*)/) || [])[1] || '') + ' body=' + (str || '').replace(/\s+/g, ' ').substring(0, 200));
 
           if (extract.film_id) {
             getEpisodes(success);
@@ -2132,12 +2119,9 @@
               network.clear();
               network.timeout(10000);
               network["native"](component.proxyLink(url, prox, prox_enc, 'enc2t'), function (json) {
-                dbg('episodes ' + JSON.stringify(json).substring(0, 200));
                 extractEpisodes(json, translator_id);
-                dbg('episodes parsed seasons=' + extract.season.length + ' episodes=' + extract.episode.length);
                 call();
               }, function (a, c) {
-                dbg('episodes error status=' + (a && a.status) + ' ' + c + ' body=' + ((a && a.responseText) || '').substring(0, 150));
                 component.empty(network.errorDecode(a, c));
               }, postdata, {
                 withCredentials: logged_in,
