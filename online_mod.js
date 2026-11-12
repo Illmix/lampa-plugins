@@ -13446,8 +13446,9 @@
     function initStorage() {
       if (!Utils.isDebug()) {
         Lampa.Storage.set('online_mod_proxy_lumex', 'false');
-        Lampa.Storage.set('online_mod_proxy_rezka2', Lampa.Platform.is('android') || isLocal ? 'false' : 'true');
-        Lampa.Storage.set('online_mod_proxy_rezka2_mirror', Lampa.Platform.is('android') || isLocal ? false : true);
+        var noRezkaProxy = Lampa.Platform.is('android') || Lampa.Platform.is('tizen') || Lampa.Platform.is('webos') || isTizen || isLocal;
+        Lampa.Storage.set('online_mod_proxy_rezka2', noRezkaProxy ? 'false' : 'true');
+        Lampa.Storage.set('online_mod_proxy_rezka2_mirror', !noRezkaProxy);
         Lampa.Storage.set('online_mod_proxy_kinobase', 'false');
         Lampa.Storage.set('online_mod_proxy_collaps', 'false');
         Lampa.Storage.set('online_mod_proxy_cdnmovies', 'false');
